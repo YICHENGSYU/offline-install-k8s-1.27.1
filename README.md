@@ -942,8 +942,7 @@ kubelet的證書由apiserver動態簽署。
 還是由我們統一頒發一個證書。
 
 ```
-
-![](https://hackmd.io/_uploads/HyRaTcW1a.png)
+![image](https://github.com/YICHENGSYU/offline-install-k8s-1.27.1/assets/107453333/acd10f5b-282a-4055-8bbf-29e6ce9fcda1)
 
 ```
 
