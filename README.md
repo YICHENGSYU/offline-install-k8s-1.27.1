@@ -17,7 +17,7 @@ sudo vim /etc/hosts
 -----------------------------------
 
 
-10.146.67.194        master01
+${master node ip}    master01
 ${worker node ip}    worker01
 
 
@@ -239,9 +239,6 @@ EOF
  
 sysctl --system
 
-獲取阿里云YUM源
-wget -O /etc/yum.repos.d/docker-ce.repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
-
 查看YUM源中Containerd
 # yum list | grep containerd
 containerd.io.x86_64                        1.4.12-3.1.el7             docker-ce-stable
@@ -392,10 +389,6 @@ sudo vim /etc/containerd/config.toml
 /etc/containerd/config.toml
 -----
 SystemdCgroup = false 改為 SystemdCgroup = true
-
-sandbox_image = "k8s.gcr.io/pause:3.7"
-改為：
-sandbox_image = "registry.aliyuncs.com/google_containers/pause:3.7"
 ------
 
 sudo systemctl enable containerd
@@ -510,7 +503,7 @@ server-csr.json
 {
     "CN": "etcd",
     "hosts": [
-    "10.146.67.194",
+    ${master node1 ip},
     ${master node2 ip},
     ${master node3 ip},
     ${worker node1 ip},
@@ -581,12 +574,12 @@ etcd.conf
 #[Member]
 ETCD_NAME="etcd-1"
 ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
-ETCD_LISTEN_PEER_URLS="https://10.146.67.194:2380"
-ETCD_LISTEN_CLIENT_URLS="https://10.146.67.194:2379"
+ETCD_LISTEN_PEER_URLS="https://${master node1 ip}:2380"
+ETCD_LISTEN_CLIENT_URLS="https://${master node1 ip}:2379"
 #[Clustering]
-ETCD_INITIAL_ADVERTISE_PEER_URLS="https://10.146.67.194:2380"
-ETCD_ADVERTISE_CLIENT_URLS="https://10.146.67.194:2379"
-ETCD_INITIAL_CLUSTER="etcd-1=https://10.146.67.194:2380,etcd-2=https://${worker01 IP}:2380,etcd-3=https://${worker02 IP}:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://${master node1 ip}:2380"
+ETCD_ADVERTISE_CLIENT_URLS="https://${master node1 ip}:2379"
+ETCD_INITIAL_CLUSTER="etcd-1=https://${master node1 ip}:2380,etcd-2=https://${worker01 IP}:2380,etcd-3=https://${worker02 IP}:2380"
 ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
 ETCD_INITIAL_CLUSTER_STATE="new"
 ---------------------------------------------------------------------------
@@ -666,7 +659,7 @@ ETCD_LISTEN_CLIENT_URLS="https://${worker01 IP}:2379"
 #[Clustering]
 ETCD_INITIAL_ADVERTISE_PEER_URLS="https://${worker01 IP}:2380"
 ETCD_ADVERTISE_CLIENT_URLS="https://${worker01 IP}:2379"
-ETCD_INITIAL_CLUSTER="etcd-1=https://10.146.67.194:2380,etcd-2=https://${worker01 IP}:2380,etcd-3=https://${worker02 IP}:2380"
+ETCD_INITIAL_CLUSTER="etcd-1=https://${master node1 ip}:2380,etcd-2=https://${worker01 IP}:2380,etcd-3=https://${worker02 IP}:2380"
 ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
 ETCD_INITIAL_CLUSTER_STATE="new"
 ------------------------------------------------------------------
@@ -688,7 +681,7 @@ ETCD_LISTEN_CLIENT_URLS="https://${worker02 IP}:2379"
 #[Clustering]
 ETCD_INITIAL_ADVERTISE_PEER_URLS="https://${worker02 IP}:2380"
 ETCD_ADVERTISE_CLIENT_URLS="https://${worker02 IP}:2379"
-ETCD_INITIAL_CLUSTER="etcd-1=https://10.146.67.194:2380,etcd-2=https://${worker01 IP}:2380,etcd-3=https://${worker02 IP}:2380"
+ETCD_INITIAL_CLUSTER="etcd-1=https://${master node1 ip}:2380,etcd-2=https://${worker01 IP}:2380,etcd-3=https://${worker02 IP}:2380"
 ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
 ETCD_INITIAL_CLUSTER_STATE="new"
 ---------------------------------------------------------------------
@@ -701,7 +694,7 @@ sudo systemctl enable etcd
 
 
 驗證：
-ETCDCTL_API=3 /opt/etcd/bin/etcdctl --cacert=/opt/etcd/ssl/ca.pem --cert=/opt/etcd/ssl/server.pem --key=/opt/etcd/ssl/server-key.pem --endpoints="https://10.146.67.194:2379,https://${worker01 IP}:2379,https://${worker02 IP}:2379" endpoint health --write-out=table
+ETCDCTL_API=3 /opt/etcd/bin/etcdctl --cacert=/opt/etcd/ssl/ca.pem --cert=/opt/etcd/ssl/server.pem --key=/opt/etcd/ssl/server-key.pem --endpoints="https://${master node1 ip}:2379,https://${worker01 IP}:2379,https://${worker02 IP}:2379" endpoint health --write-out=table
 ```
 
 
@@ -793,7 +786,7 @@ server-csr.json
     "hosts": [
       "10.0.0.1",
       "127.0.0.1",
-      "10.146.67.194",
+      "${master node1 ip}",
       "${worker01 IP}",
       "${worker02 IP}",
       "kubernetes",
@@ -862,10 +855,10 @@ sudo vim /opt/kubernetes/cfg/kube-apiserver.conf
 ----------------------------------------------------------------------------
 KUBE_APISERVER_OPTS="--enable-admission-plugins=NamespaceLifecycle,NodeRestriction,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota \
 --v=2 \
---etcd-servers=https://10.146.67.194:2379,https://${worker01 IP}:2379,https://${worker02 IP}:2379 \
---bind-address=10.146.67.194 \
+--etcd-servers=https://${master node1 ip}:2379,https://${worker01 IP}:2379,https://${worker02 IP}:2379 \
+--bind-address=${master node1 ip} \
 --secure-port=6443 \
---advertise-address=10.146.67.194 \
+--advertise-address=${master node1 ip} \
 --allow-privileged=true \
 --service-cluster-ip-range=10.0.0.0/24 \
 --authorization-mode=RBAC,Node \
@@ -1062,7 +1055,7 @@ cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kube
 
 KUBE_CONFIG="/opt/kubernetes/cfg/kube-controller-manager.kubeconfig"
 
-KUBE_APISERVER="https://10.146.67.194:6443"
+KUBE_APISERVER="https://${master node1 ip}:6443"
 
 sudo kubectl config set-cluster kubernetes --certificateauthority=/opt/kubernetes/ssl/ca.pem --embed-certs=true --server=${KUBE_APISERVER} --kubeconfig=${KUBE_CONFIG}
 
@@ -1170,7 +1163,7 @@ cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kube
 
 KUBE_CONFIG="/opt/kubernetes/cfg/kube-scheduler.kubeconfig"
 
-KUBE_APISERVER="https://10.146.67.194:6443"
+KUBE_APISERVER="https://${master node1 ip}:6443"
 
 sudo kubectl config set-cluster kubernetes --certificate-authority=/opt/kubernetes/ssl/ca.pem --embed-certs=true --server=${KUBE_APISERVER} --kubeconfig=${KUBE_CONFIG}
 
@@ -1248,7 +1241,7 @@ cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kube
 mkdir /root/.kube
 
 KUBE_CONFIG="/root/.kube/config"
-KUBE_APISERVER="https://10.146.67.194:6443"
+KUBE_APISERVER="https://${master node1 ip}:6443"
 
 sudo kubectl config set-cluster kubernetes --certificate-authority=/opt/kubernetes/ssl/ca.pem --embed-certs=true --server=${KUBE_APISERVER} --kubeconfig=${KUBE_CONFIG}
 
@@ -1363,7 +1356,7 @@ maxPods: 110
 #生成kubelet初次加入集群引導kubeconfig文件
 KUBE_CONFIG="/opt/kubernetes/cfg/bootstrap.kubeconfig"
 
-KUBE_APISERVER="https://10.146.67.194:6443" # apiserver IP:PORT
+KUBE_APISERVER="https://${master node1 ip}:6443" # apiserver IP:PORT
 
 TOKEN=" 33da7da57de05b211fc02e93b655bfbe" # 与token.csv里保持一致
 
@@ -1524,7 +1517,7 @@ cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kube
 
 KUBE_CONFIG="/opt/kubernetes/cfg/kube-proxy.kubeconfig"
 
-KUBE_APISERVER="https://10.146.67.194:6443"
+KUBE_APISERVER="https://${master node1 ip}:6443"
 
 kubectl config set-cluster kubernetes --certificate-authority=/opt/kubernetes/ssl/ca.pem --embed-certs=true --server=${KUBE_APISERVER} --kubeconfig=${KUBE_CONFIG}
 
@@ -1816,7 +1809,7 @@ ${admin-user token}
 
 打開web
 
-https://10.146.67.194:30001
+https://${master node1 ip}:30001
 
 填入獲得的admin-user token
 
@@ -2069,7 +2062,7 @@ sudo kubectl get deploy,svc,pod
   
   
 #### 確認nginx是否成功運作  
-curl  http://10.146.67.194:${nginx port(30000開頭)}
+curl  http://${master node1 ip}:${nginx port(30000開頭)}
 ```
 
 
